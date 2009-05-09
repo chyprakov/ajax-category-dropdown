@@ -4,7 +4,7 @@ Plugin Name:Ajax Category Dropdown
 Plugin URI: http://www.dyasonhat.com/ajax-category-dropdown/
 Description: Generates multi-level ajax populated category dropdown widget. Perfect for blog with large numbers of categories as it only loads category sub level via AJAX requests.
 Author: DyasonHat
-Version: 0.1.4b
+Version: 0.1.5
 Author URI: http://www.dyasonhat.com
 */ 
 
@@ -27,6 +27,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 /*
 CHANGELOG
+09-05-2009
+    0.1.5 Version stable, no serious bugs reported
+    Added options to widget to show/hide count
+    Added options to widget to choose what to count ie: posts, sub cats etc
+    Added options to widget to choose how to sort the categories in the select boxes.
 21-04-2009
     Version 0.1.1b Fixed folder naming issue
 19-04-2009
@@ -323,17 +328,70 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
         /**
         * Calculates if the current category has posts either within it's self, or it children
         */
-        function categoryHasPosts($id) {
-            //global $wpdb;
+        function categoryHasPosts($id, $countwhat = 'subposts') {
+            global $wpdb;
             
-            $posts = new WP_Query("cat=$id&showposts=-1");
-            $count = $posts->post_count;
-            if ($count > 0) {
-                return $count;
+            if ($countwhat == 'subposts') {
+                $posts = new WP_Query("cat=$id&showposts=-1");
+                $count = $posts->post_count;
+                if ($count > 0) {
+                    return $count;
+                }
+                else {
+                    return false;
+                }
+            }
+            elseif ($countwhat == 'parentposts') {
+                $sql = "SELECT COUNT(*) FROM $wpdb->term_relationships LEFT JOIN
+                        $wpdb->term_taxonomy ON ($wpdb->term_relationships.term_taxonomy_id = $wpdb->term_taxonomy.term_taxonomy_id)
+                        WHERE
+                        $wpdb->term_taxonomy.taxonomy = 'category'
+                        AND $wpdb->term_taxonomy.term_id = $id
+                        GROUP BY $wpdb->term_taxonomy.term_id";
+                echo $sql;
+                $count = $wpdb->get_var($sql);
+                //$count = $posts->post_count;
+                if ($count > 0) {
+                    echo "FOUND $count";
+                    return $count;
+                }
+                else {
+                    echo "COULDNTFOUND $count";
+                    $posts = new WP_Query("cat=$id&showposts=-1");
+                    $count = $posts->post_count;
+                    if ($count > 0) {
+                        return $count;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+            }
+            elseif ($countwhat == 'subcats') {
+                $posts = new WP_Query("cat=$id&showposts=-1");
+                $count = $posts->post_count;
+                if ($count > 0) {
+                    $sql = "SELECT COUNT(*) FROM $wpdb->term_taxonomy
+                            WHERE
+                            $wpdb->term_taxonomy.taxonomy = 'category'
+                            AND $wpdb->term_taxonomy.parent = $id
+                            GROUP BY $wpdb->term_taxonomy.parent";
+                    $count = $wpdb->get_var($sql);
+                    
+                    if ($count == false) {
+                        return '0';
+                    }
+                    return $count;
+                }
+                else {
+                    return false;
+                }
+                
             }
             else {
                 return false;
             }
+            
                      
         }
         /**
@@ -439,7 +497,7 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
         }
         
         function add_admin_pages(){
-                add_submenu_page('options-general.php', "Ajax Category Dropdown", " Ajax Category Dropdown", 10, "Ajax Category Dropdown", array(&$this,"output_sub_admin_page_0"));
+                //add_submenu_page('options-general.php', "Ajax Category Dropdown", " Ajax Category Dropdown", 10, "Ajax Category Dropdown", array(&$this,"output_sub_admin_page_0"));
         }
         
         /**
@@ -534,14 +592,31 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                     else
                         $text = stripslashes(wp_filter_post_kses( $widget_text['text'] ));
                     
-                    $widget_vars  = array('title', 'text');
+                    $countshow = $widget_text['countshow'];
+                    $countwhat = $widget_text['countwhat'];
+                    $direction = $widget_text['direction'];
+                    $sortby    = $widget_text['sortby'];
+                    $emptyshow = $widget_text['emptyshow'];
+                    $wrapformwidth    = $widget_text['wrapformwidth'];
+                    $categorywrapwidth= $widget_text['categorywrapwidth'];
                     
+                    $widget_vars  = array('title', 'text');
+                    $widget_vars[] = 'emptyshow';
+                    $widget_vars[] = 'countshow';
+                    $widget_vars[] = 'countwhat';
+                    $widget_vars[] = 'direction';
+                    $widget_vars[] = 'sortby';
+                    $widget_vars[] = 'categorywrapwidth';
+                    $widget_vars[] = 'wrapformwidth';
                     for($i=0;$i<=$this->totalLevels();$i++){
                         //set variable names eg: $level1    
                         $a[$i]   = "level".$i;
                         ${$a[$i]} = strip_tags(stripslashes($widget_text["level$i"]));
                         $widget_vars[] = "level".$i;
-                    }    
+                    }
+                    
+                    
+                    
                     
                     $options[$widget_number] = compact( $widget_vars );
                 }
@@ -560,10 +635,26 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                         $a[$i]   = "level".$i;
                         ${$a[$i]} = "Level " . $i;
                     }
+                
+                $countshow = 1;
+                $countwhat = "subposts";
+                $direction = "vertical";
+                $sortby    = "titleasc";
+                $wrapformwidth    = "100%";
+                $categorywrapwidth= "100%";
+                $emptyshow = 0;
                     
             } else {
                 $title = attribute_escape($options[$number]['title']);
                 $text = format_to_edit($options[$number]['text']);
+                
+                $emptyshow = attribute_escape($options[$number]["emptyshow"]);
+                $countshow = attribute_escape($options[$number]["countshow"]);
+                $countwhat = attribute_escape($options[$number]["countwhat"]);
+                $direction = attribute_escape($options[$number]["direction"]);
+                $sortby    = attribute_escape($options[$number]["sortby"]);
+                $wrapformwidth    = attribute_escape($options[$number]["wrapformwidth"]);
+                $categorywrapwidth= attribute_escape($options[$number]["categorywrapwidth"]);
                 
                 for($i=0;$i<=$this->totalLevels();$i++){
                         //set variable names eg: $level1    
@@ -590,7 +681,44 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                         <?php
                         }                
                     ?>
-                                        
+                    <p>
+                        <input type="checkbox" id="dacd-emptyshow-<?php echo $number; ?>" name="widget-dacd[<?php echo $number; ?>][emptyshow]" value="1" <?php if ($emptyshow == 1) {echo "Checked";} ?>/>
+                        <label for="dacd-emptyshow-<?php echo $number; ?>">Show empty categories</label>
+                    </p>
+                    <p>
+                        <input type="checkbox" id="dacd-countshow-<?php echo $number; ?>" name="widget-dacd[<?php echo $number; ?>][countshow]" value="1" <?php if ($countshow == 1) {echo "Checked";} ?>/>
+                        <label for="dacd-countshow-<?php echo $number; ?>">Display count</label>
+                    </p>                    
+                    <p>
+                        <p>Choose what you want counted.</p>
+                        <select id="dacd-countwhat-<?php echo $number; ?>" name="widget-dacd[<?php echo $number; ?>][countwhat]">
+                            <option value="parentposts" <?php if($countwhat == "parentposts") {echo "selected";}?> >Posts in Parent Category Only</option>
+                            <option value="subposts" <?php if($countwhat == "subposts") {echo "selected";}?> >Posts in All Sub-Categories</option>
+                            <option value="subcats" <?php if($countwhat == "subcats") {echo "selected";}?> >Categories Sub-Categoies</option>
+                        </select>
+                    </p>
+                    <p>
+                        <p>Choose the order you want the categories displayed in.</p>
+                        <select id="dacd-sortby-<?php echo $number; ?>" name="widget-dacd[<?php echo $number; ?>][sortby]">
+                            <option value="titleasc" <?php if($sortby == "titleasc") {echo "selected";}?> >Name A-Z</option>
+                            <option value="titledesc" <?php if($sortby == "titledesc") {echo "selected";}?> >Name Z-A</option>
+                            <option value="postcountasc" <?php if($sortby == "postcountasc") {echo "selected";}?> >Post count low-high</option>
+                            <option value="postcountdesc" <?php if($sortby == "postcountdesc") {echo "selected";}?> >Post count high-low</option>
+                        </select>
+                    </p>
+                    <p>
+                        <p>Display dropdowns as a vertical list (ie: one above the other) or as a horizontal list (ie: next to each other).</p>
+                        <input type="radio" id="dacd-direction-<?php echo $number; ?>" name="widget-dacd[<?php echo $number; ?>][direction]" value="vertical" <?php if($direction == "vertical") {echo "checked";}?>/>Vertical
+                        <input type="radio" id="dacd-direction-<?php echo $number; ?>" name="widget-dacd[<?php echo $number; ?>][direction]" value="horizontal" <?php if($direction == "horizontal") {echo "checked";}?>/>Horizontal                       
+                    </p>
+                    <p>
+                        <label for="dacd-wrapformwidth-<?php echo $number; ?>">Total Width of the Widget (eg 19px or 100%)</label>
+                        <input class="widefat" id="dacd-wrapformwidth-<?php echo $number; ?>" name="widget-dacd[<?php echo $number; ?>][wrapformwidth]" type="text" value="<?php echo $wrapformwidth; ?>" />    
+                    </p>
+                    <p>
+                        <label for="dacd-categorywrapwidth-<?php echo $number; ?>">Width of Each Select Box (eg 19px or 100%)</label>
+                        <input class="widefat" id="dacd-categorywrapwidth-<?php echo $number; ?>" name="widget-dacd[<?php echo $number; ?>][categorywrapwidth]" type="text" value="<?php echo $categorywrapwidth; ?>" />    
+                    </p>
                     <input type="hidden" id="dacd-submit-<?php echo $number; ?>" name="dacd-submit-<?php echo $number; ?>" value="1" />
                 </p>
         <?php
@@ -632,8 +760,27 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
             if ( !isset($options[$number]) )
                 return;
 
-            $title = $options[$number]['title'];
-            $text  = $options[$number]['text'];
+            $title      = $options[$number]['title'];
+            $text       = $options[$number]['text'];
+            $emptyshow  = $options[$number]['emptyshow'];
+            $countshow  = $options[$number]['countshow'];
+            $countwhat  = $options[$number]['countwhat'];
+            $sortby     = $options[$number]['sortby'];
+            $direction  = $options[$number]['direction'];
+            $wrapformwidth  = $options[$number]['wrapformwidth'];
+            $categorywrapwidth  = $options[$number]['categorywrapwidth'];
+            
+            //create the styles
+            if ($direction == 'vertical') {
+                $wrapform  = "width:$wrapformwidth;";
+                $categorywrap  = "width:$categorywrapwidth;";
+            }
+            else {
+                $wrapform  = "width:$wrapformwidth; float:left;";
+                $categorywrap  = "width:$categorywrapwidth; float:left; clear:none;";
+            }
+            
+            
             for($i=0;$i<=$this->totalLevels();$i++){
                 //set variable names eg: $level1    
                 $leveltitle[$i] = attribute_escape($options[$number]["level$i"]);
@@ -641,13 +788,45 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
             
             //Saving as $widgetNumber to ensure clarity
             $widgetNumber = $number;
+            
+            //Creat MYSQL sort by
+            switch ($sortby) {
+               case "titleasc":
+                    $sort = "$wpdb->terms.name ASC";
+                 break;
+               case "titledesc":
+                    $sort = "$wpdb->terms.name DESC";
+                 break;
+               case "postcountasc":
+                    $sort = "$wpdb->term_taxonomy.count ASC";
+                 break;
+               case "postcountdesc":
+                    $sort = "$wpdb->term_taxonomy.count DESC";
+                 break;
+            }
+            
+            //Show empty
+            if ($emptyshow == '1') {
+                $emptyshow = true;
+            }
+            else {
+                $emptyshow = false;
+            }
+            
+            //show count 
+            if ($countshow == '1') {
+                $countshow = true;
+            }
+            else {
+                $countshow = false;
+            }
                        
             ?>
             <?php echo $before_widget; ?>
             <?php echo $before_title . $title . $after_title; ?>
                 <form method="get" id="categoryform" action="">
-                    <div id="wrapform">
-                    <div id="loadin" style="display:none;"><div id="loadindiv"><div id="loadpic"></div></div></div>
+                    <div id="wrapform" style="<?php echo $wrapform; ?>">
+                        <div id="wrapallcat">
                     <?php
                     
                     // If category or single then we need to load the appropriate levels into the widget.
@@ -657,7 +836,7 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                         $currentCategory = $this->currentCategory();
                         //echo $currentCategory;
                         //Echo first level then loop through other levels ?>
-                        <div class="categorywrap">
+                        <div class="categorywrap" style="<?php echo $categorywrap;?>;"> 
                             <label class="label" for="cat0"></label>
                             <div id="wcat0">
                                 <select class="nav_select" name="cat0" id="cat0" size="1" onchange="setCat(this.form.cat0.value, '0', '<?php echo $widgetNumber; ?>');">
@@ -669,7 +848,7 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                                                         ($wpdb->terms.term_id = $wpdb->term_taxonomy.term_id)
                                                         WHERE $wpdb->term_taxonomy.taxonomy = 'category'
                                                         AND $wpdb->term_taxonomy.parent = '0'
-                                                        ORDER BY $wpdb->terms.name ASC"                        
+                                                        ORDER BY $sort"                        
                                                         ;
                                 $dhat_ajax_categorylist = $wpdb->get_results($dhat_ajax_cat_query);
                                 
@@ -677,8 +856,8 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                                 $parent = '';
                                 
                                 foreach ($dhat_ajax_categorylist as $dhat_ajax_cat) {
-                                    $totalPosts = $this->categoryHasPosts($dhat_ajax_cat->term_id);
-                                    if ($totalPosts !== false) {
+                                    $totalPosts = $this->categoryHasPosts($dhat_ajax_cat->term_id, $countwhat);
+                                    if (($totalPosts !== false) OR (($totalPosts == false) AND ($emptyshow))) {
                                         $dhat_ajax_option = '<option value="'.$dhat_ajax_cat->term_id.'" ';
                                     
                                         if ($this->isParentCategory($currentCategory, $dhat_ajax_cat->term_id)) {
@@ -689,7 +868,9 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                                         }
                                         $dhat_ajax_option .= '>';
                                         $dhat_ajax_option .= $dhat_ajax_cat->name;
-                                        $dhat_ajax_option .= ' ('.$totalPosts.')';
+                                        if ($countshow) {
+                                            $dhat_ajax_option .= ' ('.$totalPosts.')';
+                                        }                                                                                     
                                         $dhat_ajax_option .= '</option>
                                         ';
                                         echo $dhat_ajax_option;
@@ -713,7 +894,7 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                         for($i=1;$i<=$this->totalLevels();$i++){ 
                             if ($hasParent AND $this->hasChildCategories($parent)) { //Have a parent so populate a select box
                             ?>
-                                <div class="categorywrap">
+                                <div class="categorywrap" style="<?php echo $categorywrap;?>;"> 
                                     <label class="label" for="cat<?php echo $i; ?>"></label>
                                     <div id="wcat<?php echo $i; ?>">
                                         <select class="nav_select" name="cat<?php echo $i; ?>" id="cat<?php echo $i; ?>" size="1" onchange="setCat(this.form.cat<?php echo $i; ?>.value, '<?php echo $i; ?>', '<?php echo $widgetNumber; ?>');">
@@ -725,13 +906,13 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                                                                 ($wpdb->terms.term_id = $wpdb->term_taxonomy.term_id)
                                                                 WHERE $wpdb->term_taxonomy.taxonomy = 'category'
                                                                 AND $wpdb->term_taxonomy.parent = '$parent'
-                                                                ORDER BY $wpdb->terms.name ASC"                        
+                                                                ORDER BY $sort"                        
                                                                 ;
                                         $dhat_ajax_categorylist = $wpdb->get_results($dhat_ajax_cat_query);
                                         $hasParent = false; //reset to false and see if this level has more
                                         foreach ($dhat_ajax_categorylist as $dhat_ajax_cat) {
-                                            $totalPosts = $this->categoryHasPosts($dhat_ajax_cat->term_id);
-                                            if ($totalPosts !== false) {
+                                            $totalPosts = $this->categoryHasPosts($dhat_ajax_cat->term_id, $countwhat);
+                                            if (($totalPosts !== false) OR (($totalPosts == false) AND ($emptyshow))) {
                                                 $dhat_ajax_option = '<option value="'.$dhat_ajax_cat->term_id.'" ';
                                                 if ($this->isParentCategory($currentCategory, $dhat_ajax_cat->term_id)) {
                                                     $dhat_ajax_option   .= 'selected';
@@ -739,7 +920,10 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                                                     $parent             = $dhat_ajax_cat->term_id;
                                                 }
                                                 
-                                                $dhat_ajax_option .= '>'.$dhat_ajax_cat->name.' ('.$totalPosts.')';
+                                                $dhat_ajax_option .= '>'.$dhat_ajax_cat->name.'';
+                                                if ($countshow) {
+                                                    $dhat_ajax_option .= ' ('.$totalPosts.')';
+                                                } 
                                                 $dhat_ajax_option .= '</option>';
                                                 
                                                 echo $dhat_ajax_option;
@@ -760,7 +944,7 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                             }
                             else {    // No parent to work with so output unfilled select
                                 ?>
-                                <div class="categorywrap">
+                                <div class="categorywrap" style="<?php echo $categorywrap;?>;">
                                     <label class="label" for="cat<?php echo $i; ?>"></label>
                                     <div id="wcat<?php echo $i; ?>">
                                         <select disabled class="nav_select" name="cat<?php echo $i; ?>" id="cat<?php echo $i; ?>" size="1" onchange="">
@@ -776,7 +960,7 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                     else { // No need to Populate the levels just create the basic structure.
                         
                         //Echo first level then loop through other levels ?>
-                        <div class="categorywrap">
+                        <div class="categorywrap" style="<?php echo $categorywrap;?>;"> 
                             <label class="label" for="cat0"></label>
                             <div id="wcat0">
                                 <select class="nav_select" name="cat0" id="cat0" size="1" onchange="setCat(this.form.cat0.value, '0', '<?php echo $widgetNumber; ?>');">
@@ -788,13 +972,14 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                                                         ($wpdb->terms.term_id = $wpdb->term_taxonomy.term_id)
                                                         WHERE $wpdb->term_taxonomy.taxonomy = 'category'
                                                         AND $wpdb->term_taxonomy.parent = '0'
-                                                        ORDER BY $wpdb->terms.name ASC"                        
+                                                        ORDER BY $sort"                        
                                                         ;
+                                //echo $dhat_ajax_cat_query;
                                 $dhat_ajax_categorylist = $wpdb->get_results($dhat_ajax_cat_query);
                                 
                                 foreach ($dhat_ajax_categorylist as $dhat_ajax_cat) {
-                                    $totalPosts = $this->categoryHasPosts($dhat_ajax_cat->term_id);
-                                    if ($totalPosts !== false) {
+                                    $totalPosts = $this->categoryHasPosts($dhat_ajax_cat->term_id, $countwhat);
+                                    if (($totalPosts !== false) OR (($totalPosts == false) AND ($emptyshow))) {
                                         $dhat_ajax_option = '<option value="'.$dhat_ajax_cat->term_id.'" ';
                                         
                                         if ($dhat_ajax_cat->term_id == $dhat_ajax_cat_1) {
@@ -802,7 +987,9 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                                         }
                                         $dhat_ajax_option .= '>';
                                         $dhat_ajax_option .= $dhat_ajax_cat->name;
-                                        $dhat_ajax_option .= ' ('.$totalPosts.')';
+                                        if ($countshow) {
+                                            $dhat_ajax_option .= ' ('.$totalPosts.')';
+                                        } 
                                         $dhat_ajax_option .= '</option>
                                         ';
                                         echo $dhat_ajax_option;
@@ -815,7 +1002,7 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                         </div>
                         <?php    
                         for($i=1;$i<=$this->totalLevels();$i++){ ?>
-                            <div class="categorywrap">
+                            <div class="categorywrap" style="<?php echo $categorywrap;?>;"> 
                                 <label class="label" for="cat<?php echo $i; ?>"></label>
                                 <div id="wcat<?php echo $i; ?>">
                                     <select disabled class="nav_select" name="cat<?php echo $i; ?>" id="cat<?php echo $i; ?>" size="1" onchange="">
@@ -827,6 +1014,8 @@ if (!class_exists('dhat_ajax_cat_dropdown')) {
                         <?php           
                         }
                     } ?>
+                    </div>
+                    <div id="loadin" style="display:none;"><div id="loadindiv"><div id="loadpic"></div></div></div>
                     </div>
                 </form>
             <?php echo $after_widget; ?>

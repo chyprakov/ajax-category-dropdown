@@ -2,7 +2,7 @@
 function setCat(category_field,cat_level,widget_number)
 {
     if (!(category_field == "xselect")) {
-        document.getElementById("loadpic").style.height = document.getElementById('wrapform').offsetHeight + 'px';
+        document.getElementById("loadpic").style.height = document.getElementById('wrapallcat').offsetHeight + 'px';
         document.getElementById("loadin").style.display = 'block';
 
         var mysack = new sack(DACDSettings.requesturl);    
