@@ -2,7 +2,7 @@
 include_once('../../../../wp-blog-header.php');
 //include_once('../../../../wp-includes/wp-db.php');
 	
-function dya_get_subcat($main_cat, $cat_level, $widget_number){
+function dya_get_subcat($main_cat, $cat_level, $number){
 	global $wpdb;
 	$i  = $cat_level + 1; 
     $cd = new dhat_ajax_cat_dropdown();
@@ -13,14 +13,50 @@ function dya_get_subcat($main_cat, $cat_level, $widget_number){
     }
     
     $options = get_option(DACD_WIDGET_OPTION);
-    if ( !isset($options[$widget_number]) )
+    if ( !isset($options[$number]) )
         return;
 
     //$title = $options[$widget_number]['title'];
     //$text  = $options[$widget_number]['text'];
+    $title      = $options[$number]['title'];
+    $text       = $options[$number]['text'];
+    $emptyshow  = $options[$number]['emptyshow'];
+    $countshow  = $options[$number]['countshow'];
+    $countwhat  = $options[$number]['countwhat'];
+    $sortby     = $options[$number]['sortby'];
+    $direction  = $options[$number]['direction'];        
+    //Creat MYSQL sort by
+    switch ($sortby) {
+       case "titleasc":
+            $sort = "$wpdb->terms.name ASC";
+         break;
+       case "titledesc":
+            $sort = "$wpdb->terms.name DESC";
+         break;
+       case "postcountasc":
+            $sort = "$wpdb->term_taxonomy.count ASC";
+         break;
+       case "postcountdesc":
+            $sort = "$wpdb->term_taxonomy.count DESC";
+         break;
+    }    
+    //Show empty
+    if ($emptyshow == '1') {
+        $emptyshow = true;
+    }
+    else {
+        $emptyshow = false;
+    }    
+    //show count 
+    if ($countshow == '1') {
+        $countshow = true;
+    }
+    else {
+        $countshow = false;
+    }
     for($j=0;$j<=$cd->totalLevels();$j++){
         //set variable names eg: $level1    
-        $leveltitle[$j] = attribute_escape($options[$widget_number]["level$j"]);
+        $leveltitle[$j] = attribute_escape($options[$number]["level$j"]);
     }
     
     
@@ -29,20 +65,23 @@ function dya_get_subcat($main_cat, $cat_level, $widget_number){
 	//
 	// 
 	//
-	$wcat  = "<label class=\"label\" for=\"cat$i\"></label><select class=\"nav_select\" name=\"cat$i\" id=\"cat$i\" size=\"1\" onchange=\"setCat(this.options[this.selectedIndex].value, \'$i\', \'$widget_number\');\">";
+	$wcat  = "<label class=\"label\" for=\"cat$i\"></label><select class=\"nav_select\" name=\"cat$i\" id=\"cat$i\" size=\"1\" onchange=\"setCat(this.options[this.selectedIndex].value, \'$i\', \'$number\');\">";
     $wcat .= "<option value=\"xselect\" selected=\"selected\">".$leveltitle[$i]."</option>";
 	
 	$cat_query = "SELECT * FROM $wpdb->terms
 				LEFT JOIN $wpdb->term_taxonomy ON($wpdb->terms.term_id = $wpdb->term_taxonomy.term_id)
 				WHERE $wpdb->term_taxonomy.taxonomy = 'category'
-				AND $wpdb->term_taxonomy.parent = $main_cat";
+				AND $wpdb->term_taxonomy.parent = $main_cat
+                ORDER BY $sort";
 	$categorylist = $wpdb->get_results($cat_query);
 	foreach ($categorylist as $cat) {
-        $totalPosts = $cd->categoryHasPosts($cat->term_id);
-        if ($totalPosts !== false) {
+        $totalPosts = $cd->categoryHasPosts($cat->term_id, $countwhat);
+        if (($totalPosts !== false) OR (($totalPosts == false) AND ($emptyshow))) {
 		    $option = "<option value=\"$cat->term_id\">";
 		    $option .= addslashes($cat->name);
-		    $option .= " ($totalPosts)";
+		    if ($countshow) {
+                $option .= " ($totalPosts)";
+            }
 		    $option .= "</option>";
 		    $wcat .= $option;
         }

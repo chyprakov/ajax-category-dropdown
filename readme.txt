@@ -3,7 +3,7 @@ Contributors: Dyasonhat
 Tags: categories, ajax, dropdown, widget, select, multi, level
 Requires at least: 2.7
 Tested up to: 2.7.1
-Stable tag: 0.1.3b
+Stable tag: 0.1.5
 Donate Link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=1793510
 
 Generates a multi-level (multiple select boxes) AJAX populated category dropdown widget. Perfect for blogs with large numbers of categories as it only loads category sub levels via AJAX as the user selects parent categories.
@@ -27,7 +27,6 @@ Please note this plugin is a beta release, it's probably still got a few bugs bu
 Future Versions (most of the code for this exists already but needs a bit more work before I enable these features):
 * Optionally replace the category browser for posts with an AJAX'ed version to speed up blogs with massive category lists. 
 * Optionally replace the category filter dropdown on the admin posts page with multilevel AJAX select boxes.
-* Widget vertical or horizontal option
 * Better widget CSS styling options
 * WP 2.8 widget API (code actually 80% complete, but awaiting a stable 2.8)
 
@@ -65,6 +64,11 @@ None Yet
 
 
 == Change Log ==
+09-05-2009
+    0.1.5 Version stable, no serious bugs reported
+    Added options to widget to show/hide count
+    Added options to widget to choose what to count ie: posts, sub cats etc
+    Added options to widget to choose how to sort the categories in the select boxes.
 21-04-2009
     Version 0.1.1b Fixed folder naming issue
 19-04-2009
